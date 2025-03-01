@@ -49,18 +49,12 @@ def main():
     df["Age_upon_Outcome_in_Months"] = df["Age_upon_Outcome_in_Months"].fillna(12) # impute NaN with 12 (= 1-year-old)
     # print(df[["Age_upon_Outcome", "Age_upon_Outcome_in_Months"]])
 
-    # ---- fill `null` with `Unknown` -----------
-    df["Outcome_Subtype"] = df["Outcome_Subtype"].fillna("Unknown")
-    df["gender_intake"] = df["gender_intake"].fillna("Unknown")
-    df["gender_outcome"] = df["gender_outcome"].fillna("Unknown")
-    df["fixed_intake"] = df["fixed_intake"].fillna("Unknown")
-    df["fixed_outcome"] = df["fixed_outcome"].fillna("Unknown")
-    df["Sex"] = df["Sex"].fillna("Unknown")
-    df["Outcome_Type"] = df["Outcome_Type"].fillna("Unknown")
-    df["Sex_upon_Outcome"] = df["Sex_upon_Outcome"].fillna("Unknown")
-    df["Age_upon_Outcome"] = df["Age_upon_Outcome"].fillna("12 months")
-    df["Name_intake"] = df["Name_intake"].fillna("Unknown")
-    df["Name_outcome"] = df["Name_outcome"].fillna("Unknown")
+    # Fill missing categorical values with "Unknown"
+    fill_unknown_cols = [
+        "Outcome_Subtype", "gender_intake", "fixed_intake", "fixed_outcome",
+        "Sex", "Outcome_Type", "Sex_upon_Outcome", "Age_upon_Outcome"
+    ]
+    df[fill_unknown_cols] = df[fill_unknown_cols].fillna("Unknown")
 
     # --- adjust fixed_outcome to match fixed_intake ---
     df.loc[(df["fixed_intake"].isin(["Neutered", "Spayed"])) & (df["fixed_outcome"] == "Intact"), "fixed_outcome"] = df["fixed_intake"]
