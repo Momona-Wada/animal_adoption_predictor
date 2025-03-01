@@ -30,6 +30,13 @@ def convert_age_to_months(age_str):
     else:
         return np.nan
 
+def map_outcome(outcome):
+    if outcome in ["Adoption", "Rto-Adopt"]:
+        return "Adopted"
+    elif outcome == "Return to Owner":
+        return "Return to Owner"
+    else:
+        return "Others"
 
 def main():
     df = pd.read_csv(PATH + ADOPTION_RECORD_CSV)
@@ -70,6 +77,9 @@ def main():
         "Less than 1 week": "Less than 0.25 months"
     }
     df["Age_Bucket_in_Months"] = df["Age_Bucket"].replace(bucket_mapping)
+    # Convert categorical age bucket to numerical
+    df["Age_Bucket_in_Months"] = df["Age_Bucket_in_Months"].str.extract(r'(\d+)').astype(float)
+
     # print(df[["Age_Bucket", "Age_Bucket_in_Months"]])
 
     # Identify rows where DateTime_length is negative
@@ -85,11 +95,16 @@ def main():
     # Recalculate Days_length
     df["Days_length"] = df["DateTime_length"].dt.days
 
-    df.drop(columns=["Unnamed: 0"], inplace=True)
+    df.drop(columns=["Unnamed: 0", "Animal ID", "MonthYear_intake" ,"Name_intake", "Found_Location", "Name_outcome",
+                     "MonthYear_outcome", "Age", "DateTime_intake", "DateTime_outcome", "Color_intake", "Age_Bucket",
+                     "gender_outcome", "DateTime_length"], inplace=True)
 
-    # print(df.head())
-    # print(df.info())
-    print(df.isnull().sum())
+    # ---- Map Outcome_Type to 3 classes: Adopted, Return to Owner, Others ----
+    df["Outcome_Type_3class"] = df["Outcome_Type"].apply(map_outcome)
+
+    print(df.head())
+    print(df.info())
+    # print(df.isnull().sum())
     # print(df["Outcome_Type"].value_counts())
     # print(df.describe())
 
