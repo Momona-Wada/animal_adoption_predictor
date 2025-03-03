@@ -1,6 +1,13 @@
+from mlxtend.classifier import EnsembleVoteClassifier, StackingClassifier
+from sklearn.ensemble import RandomForestClassifier, BaggingClassifier, AdaBoostClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, accuracy_score
+from sklearn.model_selection import KFold, train_test_split
+
 import numpy as np
 import pandas as pd
-
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from xgboost import XGBClassifier
 
 PATH = "/Users/momonawada/PycharmProjects/animal_adoption_predictor/"
 ADOPTION_RECORD_CSV = "all_records.csv"
@@ -37,6 +44,22 @@ def map_outcome(outcome):
         return "Return to Owner"
     else:
         return "Others"
+
+def train_model(model, X_train, y_train, X_test, y_test):
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    return evaluate_model(y_test, y_pred)
+
+def evaluate_model(y_true, y_pred):
+    accuracy = accuracy_score(y_true, y_pred)
+    report = classification_report(y_true, y_pred, output_dict=True)
+    return {
+        "accuracy": accuracy,
+        "precision": report["weighted avg"]["precision"],
+        "recall": report["weighted avg"]["recall"],
+        "f1_score": report["weighted avg"]["f1-score"]
+
+    }
 
 def main():
     df = pd.read_csv(PATH + ADOPTION_RECORD_CSV)
@@ -96,13 +119,63 @@ def main():
     # ---- Map Outcome_Type to 3 classes: Adopted, Return to Owner, Others ----
     df["Outcome_Type_3class"] = df["Outcome_Type"].apply(map_outcome)
 
-    print(df.head())
-    print(df.info())
-    # print(df.isnull().sum())
-    # print(df["Outcome_Type"].value_counts())
-    # print(df.describe())
+    # Prepare dataset for model training
+    X = df.drop(columns=["Outcome_Type", "Outcome_Type_3class"])
+    y = df["Outcome_Type_3class"]
 
+    # Convert target variable to numerical labels
+    label_encoder = LabelEncoder()
+    y = label_encoder.fit_transform(y)
+
+    # One-hot encoding for categorical variables
+    X = pd.get_dummies(X, drop_first=True)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    # ---- KFold Cross Validation ----
+    NUM_SPLITS = 5
+
+    kfold = KFold(n_splits=NUM_SPLITS, shuffle=True)
+    for train_index, test_index in kfold.split(X_train_scaled):
+        X_train_fold, X_val_fold = X_train_scaled[train_index], X_train_scaled[test_index]
+        print(f"Train Fold Size: {X_train_fold.shape}, Validation Fold Size: {X_val_fold.shape}")
+
+    print(f"Final Test Size: {X_test_scaled.shape}")
+
+    # --- Model evaluation ---
+    models = {
+        "RandomForest": RandomForestClassifier(n_estimators=100),
+        "Bagging": BaggingClassifier(estimator=RandomForestClassifier(), n_estimators=10),
+        "VotingEnsemble": EnsembleVoteClassifier(clfs=[
+            RandomForestClassifier(n_estimators=50),
+            AdaBoostClassifier(n_estimators=50),
+            XGBClassifier(use_label_encoder=False, eval_metric="mlogloss")
+        ], voting="hard"),
+        "Stacked": StackingClassifier(classifiers=[
+            RandomForestClassifier(n_estimators=50),
+            AdaBoostClassifier(n_estimators=50),
+            XGBClassifier(use_label_encoder=False, eval_metric="mlogloss")
+        ], meta_classifier=LogisticRegression()),
+        "LogisticRegression": LogisticRegression()
+    }
+
+    results = {}
+
+    for name, model in models.items():
+        print(f"\nTraining {name}...")
+        results[name] = train_model(model, X_train_scaled, y_train, X_test_scaled, y_test)
+
+    df_results = pd.DataFrame(results).T
+
+    print(f"\n*** Model Evaluation Results ***")
+    print(df_results)
+
+    print(f"\n*** Stacked Model Performance ***")
+    print(df_results.loc["Stacked"])
 
 if __name__ == "__main__":
     main()
-
